@@ -303,6 +303,25 @@ Failed to apply library options
 This script uses the Jellyfin REST API. For detailed API documentation, see:
 https://api.jellyfin.org/
 
+The implementation is based on the **Jellyfin OpenAPI stable specification** (`jellyfin-openapi-stable.json`) and follows the official API contract for:
+
+- **Authentication**: X-Emby-Token header with API key
+- **Library Management**: `/Library/VirtualFolders` endpoints
+- **Library Options**: `/Library/VirtualFolders/LibraryOptions` for detailed configuration
+- **Scheduled Tasks**: `/ScheduledTasks` endpoints for task management
+- **Task Triggers**: `/ScheduledTasks/{taskId}/Triggers` for scheduling
+
+### OpenAPI Compliance
+
+The script follows the OpenAPI specification for:
+- Proper HTTP methods (GET, POST, DELETE)
+- Correct request/response formats
+- Required authentication headers
+- Query parameters and request bodies
+- Error handling and status codes
+
+For the complete OpenAPI specification, refer to the official Jellyfin API documentation.
+
 Key endpoints used:
 - `GET/POST /Library/VirtualFolders` - Library management
 - `POST /Library/VirtualFolders/LibraryOptions` - Library settings

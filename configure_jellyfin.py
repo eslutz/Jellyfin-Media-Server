@@ -14,6 +14,13 @@ Based on the configuration plan in jellyfin-config-plan.md, this script automate
 - Scheduled task configuration
 
 API Documentation: https://api.jellyfin.org/
+OpenAPI Specification: Based on jellyfin-openapi-stable.json
+
+The implementation follows the Jellyfin OpenAPI specification for:
+- Authentication via X-Emby-Token header
+- Library management endpoints (/Library/VirtualFolders)
+- LibraryOptions configuration
+- Scheduled task triggers (/ScheduledTasks/{taskId}/Triggers)
 
 Usage:
     python3 configure_jellyfin.py [--config jellyfin.config.json] [--dry-run]

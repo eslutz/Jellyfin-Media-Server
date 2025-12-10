@@ -72,6 +72,17 @@ Key endpoints implemented:
 - `/ScheduledTasks/{taskId}/Triggers` - Task scheduling
 - `/System/Info` - Connection testing
 
+#### OpenAPI Specification Compliance
+
+Implementation follows the **Jellyfin OpenAPI stable specification** (`jellyfin-openapi-stable.json`):
+
+1. **Authentication**: Uses `X-Emby-Token` header for API key authentication
+2. **Request Format**: Follows OpenAPI schema for request bodies and query parameters
+3. **Response Handling**: Properly handles API responses per specification
+4. **Data Models**: Uses correct structure for LibraryOptions and TaskTriggerInfo
+5. **HTTP Methods**: Uses appropriate methods (GET, POST, DELETE)
+6. **Ticks Conversion**: Implements `TICKS_PER_SECOND` constant (10,000,000) for Windows ticks
+
 ## Code Quality Improvements
 
 Based on code review feedback:

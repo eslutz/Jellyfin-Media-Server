@@ -6,6 +6,8 @@ Automated configuration tools for Jellyfin Media Server.
 
 This repository provides Python scripts to programmatically configure Jellyfin Media Server instances using the Jellyfin REST API.
 
+The implementation follows the **Jellyfin OpenAPI stable specification** to ensure proper API integration and compatibility.
+
 ## Features
 
 - 🔧 **Automated Library Configuration**: Create and configure media libraries via API
@@ -39,8 +41,10 @@ This repository provides Python scripts to programmatically configure Jellyfin M
 ## Documentation
 
 - **[Configuration Guide](CONFIGURATION_GUIDE.md)** - Detailed usage instructions
+- **[Examples](EXAMPLES.md)** - Practical usage examples and troubleshooting
 - **[Configuration Plan](jellyfin-config-plan.md)** - Library settings recommendations
 - **[API Reference](https://api.jellyfin.org/)** - Jellyfin REST API documentation
+- **[OpenAPI Reference](research/openapi_reference.md)** - OpenAPI specification notes
 
 ## Files
 
