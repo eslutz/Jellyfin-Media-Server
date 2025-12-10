@@ -353,7 +353,9 @@ class JellyfinConfigurator:
         if advanced.get('images'):
             image_settings = advanced['images']
             if 'skip_images_if_nfo_exists' in image_settings:
-                options['SkipSubtitlesIfEmbeddedSubtitlesPresent'] = image_settings['skip_images_if_nfo_exists']
+                # Note: This setting may not have a direct API equivalent in all Jellyfin versions
+                # The closest related setting would be part of metadata extraction options
+                options['SkipImagesIfMetadataExists'] = image_settings['skip_images_if_nfo_exists']
         
         # TypeOptions for metadata/image fetchers
         # This is a complex structure that needs to be built based on content type
