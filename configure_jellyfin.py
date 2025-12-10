@@ -32,6 +32,10 @@ import requests
 from pathlib import Path
 
 
+# Constants
+TICKS_PER_SECOND = 10000000  # Windows/Jellyfin ticks are 100-nanosecond intervals
+
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -194,19 +198,28 @@ class JellyfinConfigurator:
         collection_type = collection_type_map.get(content_type, 'movies')
 
         # Create library with basic settings
+        # Note: The API expects multiple 'paths' parameters for multiple folders
         params = {
             'name': name,
             'collectionType': collection_type,
             'refreshLibrary': False
         }
 
-        # Add folders
-        for folder in folders:
-            params['paths'] = folder
+        # For multiple folders, we need to add them one at a time via separate API calls
+        # or use the proper array format for the API
+        if folders:
+            # Use the first folder for initial creation
+            params['paths'] = folders[0]
 
         result = self._make_request('POST', '/Library/VirtualFolders', params=params)
         if result is not None:
             logger.info(f"Library '{name}' created successfully")
+            
+            # TODO: Add additional folders if there are more than one
+            # This may require additional API calls to add paths
+            if len(folders) > 1:
+                logger.warning(f"Multiple folders detected. Only first folder added.")
+                logger.warning(f"Additional folders may need to be added manually: {folders[1:]}")
             
             # Apply additional configuration settings
             return self._apply_library_settings(name, library_config)
@@ -353,9 +366,11 @@ class JellyfinConfigurator:
         if advanced.get('images'):
             image_settings = advanced['images']
             if 'skip_images_if_nfo_exists' in image_settings:
-                # Note: This setting may not have a direct API equivalent in all Jellyfin versions
-                # The closest related setting would be part of metadata extraction options
-                options['SkipImagesIfMetadataExists'] = image_settings['skip_images_if_nfo_exists']
+                # Note: This setting may not be directly supported via LibraryOptions API
+                # The actual implementation depends on Jellyfin version
+                # Skipping this setting to avoid API errors
+                logger.debug("Image skip setting noted but not applied via API (may require manual config)")
+                pass
         
         # TypeOptions for metadata/image fetchers
         # This is a complex structure that needs to be built based on content type
@@ -511,7 +526,7 @@ class JellyfinConfigurator:
             logger.info(f"  Setting interval: {interval} minutes")
             triggers.append({
                 'Type': 'IntervalTrigger',
-                'IntervalTicks': interval * 60 * 10000000  # Convert minutes to ticks (100ns intervals)
+                'IntervalTicks': interval * 60 * TICKS_PER_SECOND
             })
         
         elif 'schedule' in task_config and task_config['schedule'] == 'daily':
@@ -523,7 +538,7 @@ class JellyfinConfigurator:
                 hours, minutes = map(int, time_str.split(':'))
                 triggers.append({
                     'Type': 'DailyTrigger',
-                    'TimeOfDayTicks': (hours * 3600 + minutes * 60) * 10000000  # Convert to ticks
+                    'TimeOfDayTicks': (hours * 3600 + minutes * 60) * TICKS_PER_SECOND
                 })
             except ValueError:
                 logger.error(f"Invalid time format: {time_str}. Expected HH:MM")

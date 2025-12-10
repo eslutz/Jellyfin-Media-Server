@@ -16,6 +16,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import configure_jellyfin
 
+# Use the constant from the main module
+TICKS_PER_SECOND = configure_jellyfin.TICKS_PER_SECOND
+
 
 class TestConfigLoading(unittest.TestCase):
     """Test configuration file loading."""
@@ -182,23 +185,23 @@ class TestScheduledTaskConfiguration(unittest.TestCase):
 
     def test_interval_trigger_calculation(self):
         """Test interval trigger calculation."""
-        # 30 minutes should be 30 * 60 * 10000000 ticks
-        expected_ticks = 30 * 60 * 10000000
+        # 30 minutes should be 30 * 60 * TICKS_PER_SECOND ticks
+        expected_ticks = 30 * 60 * TICKS_PER_SECOND
         
         # This would be in the actual trigger configuration
         interval_minutes = 30
-        ticks = interval_minutes * 60 * 10000000
+        ticks = interval_minutes * 60 * TICKS_PER_SECOND
         
         self.assertEqual(ticks, expected_ticks)
 
     def test_daily_trigger_calculation(self):
         """Test daily trigger time calculation."""
-        # 03:00 should be 3 * 3600 * 10000000 ticks
+        # 03:00 should be 3 * 3600 * TICKS_PER_SECOND ticks
         hours = 3
         minutes = 0
-        expected_ticks = (hours * 3600 + minutes * 60) * 10000000
+        expected_ticks = (hours * 3600 + minutes * 60) * TICKS_PER_SECOND
         
-        self.assertEqual(expected_ticks, 3 * 3600 * 10000000)
+        self.assertEqual(expected_ticks, 3 * 3600 * TICKS_PER_SECOND)
 
 
 def run_tests():
