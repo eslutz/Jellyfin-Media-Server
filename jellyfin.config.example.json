@@ -1,0 +1,38 @@
+{
+  "server": {
+    "url": "http://localhost:8096",
+    "api_key": "YOUR_API_KEY_HERE",
+    "comment": "Get API key from Jellyfin Dashboard → API Keys"
+  },
+  "libraries": [
+    {
+      "name": "Movies",
+      "content_type": "movies",
+      "folders": ["/path/to/movies"],
+      "metadata_downloaders": [
+        {"name": "TheMovieDb", "enabled": true, "priority": 1}
+      ],
+      "image_fetchers": [
+        {"name": "TheMovieDb", "enabled": true, "priority": 1}
+      ],
+      "metadata_savers": [
+        {"name": "Nfo", "enabled": true}
+      ],
+      "advanced": {
+        "metadata": {
+          "preferred_language": "en",
+          "country": "US"
+        },
+        "trickplay": {
+          "enable_trickplay_extraction": true
+        }
+      }
+    }
+  ],
+  "scheduled_tasks": {
+    "scan_media_library": {
+      "enabled": true,
+      "interval_minutes": 30
+    }
+  }
+}

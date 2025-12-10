@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Sensitive configuration (contains API keys)
+jellyfin.config.json
+
+# Temporary files
+/tmp/
+*.tmp
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
