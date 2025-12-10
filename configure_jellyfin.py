@@ -163,6 +163,12 @@ class JellyfinConfigurator:
             True if successful, False otherwise
         """
         name = library_config.get('name')
+        
+        # Validate required fields
+        if not name:
+            logger.error("Library configuration missing required 'name' field")
+            return False
+        
         logger.info(f"Configuring library: {name}")
 
         existing_library = self.get_library_by_name(name)
@@ -209,7 +215,11 @@ class JellyfinConfigurator:
         # or use the proper array format for the API
         if folders:
             # Use the first folder for initial creation
+            # Note: 'paths' parameter takes a single path value per API call
             params['paths'] = folders[0]
+        else:
+            logger.error(f"No folders specified for library '{name}'")
+            return False
 
         result = self._make_request('POST', '/Library/VirtualFolders', params=params)
         if result is not None:
