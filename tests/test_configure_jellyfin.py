@@ -5,12 +5,10 @@ Simple tests for the Jellyfin configuration script.
 These tests validate basic functionality without requiring a live Jellyfin server.
 """
 
-import json
-import os
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 # Add parent directory to path to import configure_jellyfin
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -48,11 +46,32 @@ class TestConfigLoading(unittest.TestCase):
         self.assertIn('content_type', library)
         self.assertIn('folders', library)
         self.assertIsInstance(library['folders'], list)
+        # Validate folders are non-empty and contain valid paths
+        self.assertGreater(len(library['folders']), 0, "Library folders should not be empty")
+        for folder in library['folders']:
+            self.assertIsInstance(folder, str, "Folder paths should be strings")
+            self.assertGreater(len(folder), 0, "Folder paths should not be empty strings")
 
     def test_load_nonexistent_config(self):
         """Test that loading nonexistent config raises FileNotFoundError."""
         with self.assertRaises(FileNotFoundError):
             configure_jellyfin.load_config('nonexistent.json')
+    
+    def test_load_invalid_json(self):
+        """Test that loading invalid JSON raises appropriate error."""
+        import tempfile
+        import os
+        
+        # Create a temporary file with invalid JSON
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            f.write("{ invalid json content }")
+            temp_path = f.name
+        
+        try:
+            with self.assertRaises(Exception):  # Could be JSONDecodeError or other
+                configure_jellyfin.load_config(temp_path)
+        finally:
+            os.unlink(temp_path)
 
 
 class TestJellyfinConfigurator(unittest.TestCase):

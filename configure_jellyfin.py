@@ -37,7 +37,7 @@ import json
 import logging
 import os
 import sys
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Optional
 import requests
 from pathlib import Path
 from dotenv import load_dotenv
@@ -112,7 +112,8 @@ class JellyfinConfigurator:
                 headers=self.headers,
                 json=data,
                 params=params,
-                timeout=30
+                timeout=30,
+                verify=True
             )
             response.raise_for_status()
             
@@ -242,8 +243,17 @@ class JellyfinConfigurator:
             # TODO: Add additional folders if there are more than one
             # This may require additional API calls to add paths
             if len(folders) > 1:
-                logger.warning(f"Multiple folders detected. Only first folder added.")
-                logger.warning(f"Additional folders may need to be added manually: {folders[1:]}")
+                logger.warning(
+                    f"Multiple folders detected for library '{name}'. Only the first folder ('{folders[0]}') was added automatically."
+                )
+                logger.warning(
+                    "To add the remaining folders, open the Jellyfin web UI, go to 'Dashboard' > 'Libraries', edit the library, and add the following folders manually:"
+                )
+                for folder in folders[1:]:
+                    logger.warning(f"    {folder}")
+                logger.warning(
+                    "Alternatively, advanced users can use the Jellyfin API to add additional folders to the library."
+                )
             
             # Apply additional configuration settings
             return self._apply_library_settings(name, library_config)
@@ -367,8 +377,6 @@ class JellyfinConfigurator:
                 options['PreferredMetadataLanguage'] = metadata['preferred_language']
             if 'country' in metadata:
                 options['MetadataCountryCode'] = metadata['country']
-            if 'automatically_refresh_metadata' in metadata:
-                options['AutomaticallyAddToCollection'] = metadata['automatically_refresh_metadata']
             if 'save_artwork_into_media_folders' in metadata:
                 options['SaveLocalMetadata'] = metadata['save_artwork_into_media_folders']
         
@@ -390,11 +398,7 @@ class JellyfinConfigurator:
         if advanced.get('images'):
             image_settings = advanced['images']
             if 'skip_images_if_nfo_exists' in image_settings:
-                # Note: This setting may not be directly supported via LibraryOptions API
-                # The actual implementation depends on Jellyfin version
-                # Skipping this setting to avoid API errors
-                logger.debug("Image skip setting noted but not applied via API (may require manual config)")
-                pass
+                logger.warning("The 'skip_images_if_nfo_exists' setting is not supported via the LibraryOptions API and will be ignored. Please configure this option manually in the Jellyfin web UI if needed.")
         
         # TypeOptions for metadata/image fetchers
         # This is a complex structure that needs to be built based on content type

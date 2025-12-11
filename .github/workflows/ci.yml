@@ -35,7 +35,7 @@ jobs:
     
     - name: Lint with pylint
       run: |
-        pylint configure_jellyfin.py --disable=C0111,R0913,R0914,R0912,R0915 || true
+        pylint configure_jellyfin.py --disable=C0111,R0913,R0914,R0912,R0915 --fail-under=8.0
 
   test:
     name: Run Tests
