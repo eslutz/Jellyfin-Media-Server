@@ -4,7 +4,7 @@ Automated configuration script for Jellyfin Media Server using Python 3 and the 
 
 ## Overview
 
-This script automates the configuration of Jellyfin Media Server instances based on the settings defined in `jellyfin-config-plan.md`. It uses the Jellyfin REST API (documented at https://api.jellyfin.org/) to programmatically apply library settings, metadata configurations, and scheduled task settings.
+This script automates the configuration of Jellyfin Media Server instances based on the settings defined in `jellyfin-config-plan.md`. It uses the Jellyfin REST API to programmatically apply library settings, metadata configurations, and scheduled task settings.
 
 ## Features
 
@@ -13,297 +13,96 @@ This script automates the configuration of Jellyfin Media Server instances based
 - ✅ **Advanced Settings**: Configure language, country, chapter images, and trickplay
 - ✅ **Scheduled Tasks**: Automate library scans, chapter extraction, and intro detection
 - ✅ **Dry Run Mode**: Preview changes before applying them
-- ✅ **JSON Configuration**: Store all settings in `jellyfin.config.json`
 
 ## Requirements
 
 - Python 3.6 or higher
-- `requests` library
+- `requests` and `python-dotenv` libraries
+- Jellyfin Media Server (any recent version)
 
 ## Installation
 
-1. Install Python 3 and pip (if not already installed)
-2. Install the required Python package:
-
 ```bash
-pip3 install requests
+pip3 install -r requirements.txt
 ```
 
 ## Configuration
 
 ### 1. Get Your Jellyfin API Key
 
-1. Log into your Jellyfin server
-2. Navigate to **Dashboard → API Keys**
-3. Click **+** to create a new API key
-4. Give it a name (e.g., "Configuration Script")
-5. Copy the generated API key
+If you haven't completed the initial setup wizard yet:
+1. Access your Jellyfin server web interface
+2. Complete the initial setup wizard (create admin account, set up libraries, etc.)
 
-### 2. Configure `jellyfin.config.json`
+Once the server is set up:
+1. Log into your Jellyfin server web interface
+2. Click on your **user icon** (top right) → **Dashboard**
+3. In the left sidebar under **Advanced**, click **API Keys**
+4. Click the **+** button to create a new API key
+5. Give it a name (e.g., "Configuration Script")
+6. Copy the generated API key
 
-Edit the `jellyfin.config.json` file and update:
+### 2. Set Up Environment Variables
 
-```json
-{
-  "server": {
-    "url": "http://localhost:8096",
-    "api_key": "YOUR_API_KEY_HERE"
-  },
-  ...
-}
-```
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
 
-Replace:
-- `url`: Your Jellyfin server URL
-- `api_key`: The API key you created in step 1
+2. Edit `.env` and set your values:
+   ```bash
+   JELLYFIN_URL=http://localhost:8096
+   JELLYFIN_API_KEY=your_actual_api_key_here
+   ```
 
-### 3. Customize Library Settings
+### 3. Configure Library Settings
 
-The configuration file includes two example libraries (Movies and TV Shows). Customize them according to your needs:
+The `jellyfin.config.json` file contains all library and scheduled task configurations. Edit this file to customize:
 
-```json
-{
-  "libraries": [
-    {
-      "name": "Movies",
-      "content_type": "movies",
-      "folders": ["/path/to/your/movies"],
-      "metadata_downloaders": [...],
-      "image_fetchers": [...],
-      ...
-    }
-  ]
-}
-```
+- Library names and folder paths
+- Metadata downloader priorities
+- Image fetcher settings
+- Advanced options (language, country, chapter images, trickplay)
+- Scheduled task intervals
+
+See `jellyfin-config-plan.md` for detailed configuration recommendations.
 
 ## Usage
 
 ### Basic Usage
 
 Apply the configuration:
-
 ```bash
 python3 configure_jellyfin.py
 ```
 
 ### Dry Run Mode
 
-Preview what would be changed without making actual changes:
-
+Preview changes without making actual changes:
 ```bash
 python3 configure_jellyfin.py --dry-run
-```
-
-### Custom Configuration File
-
-Use a different configuration file:
-
-```bash
-python3 configure_jellyfin.py --config my-config.json
 ```
 
 ### Verbose Output
 
 Enable detailed logging:
-
 ```bash
 python3 configure_jellyfin.py --verbose
 ```
 
-### Combined Options
+### Custom Configuration File
 
+Use a different configuration file:
 ```bash
-python3 configure_jellyfin.py --config my-config.json --dry-run --verbose
+python3 configure_jellyfin.py --config custom-config.json
 ```
-
-## Configuration Reference
-
-### Server Settings
-
-```json
-{
-  "server": {
-    "url": "http://localhost:8096",
-    "api_key": "your-api-key-here",
-    "comment": "Get API key from Jellyfin Dashboard → API Keys"
-  }
-}
-```
-
-### Library Configuration
-
-Each library can have the following settings:
-
-```json
-{
-  "name": "Movies",
-  "content_type": "movies",  // movies, tvshows, music, books
-  "folders": ["/path/to/media"],
-  
-  "display": {
-    "display_missing_episodes": false,
-    "display_specials": false
-  },
-  
-  "library": {
-    "enable_realtime_monitoring": true
-  },
-  
-  "metadata_downloaders": [
-    {
-      "name": "TheMovieDb",  // or TheTVDB for TV shows
-      "enabled": true,
-      "priority": 1
-    }
-  ],
-  
-  "image_fetchers": [
-    {
-      "name": "TheMovieDb",
-      "enabled": true,
-      "priority": 1
-    }
-  ],
-  
-  "metadata_savers": [
-    {
-      "name": "Nfo",
-      "enabled": true
-    }
-  ],
-  
-  "advanced": {
-    "metadata": {
-      "preferred_language": "en",
-      "country": "US",
-      "prefer_embedded_titles": false,
-      "automatically_refresh_metadata": true,
-      "save_artwork_into_media_folders": false,
-      "replace_existing_images": true
-    },
-    "images": {
-      "skip_images_if_nfo_exists": true
-    },
-    "chapter_images": {
-      "enable_chapter_image_extraction": true,
-      "extract_during_library_scan": true
-    },
-    "trickplay": {
-      "enable_trickplay_extraction": true
-    }
-  }
-}
-```
-
-### Scheduled Tasks Configuration
-
-```json
-{
-  "scheduled_tasks": {
-    "scan_media_library": {
-      "enabled": true,
-      "interval_minutes": 30
-    },
-    "extract_chapter_images": {
-      "enabled": true,
-      "schedule": "daily",
-      "time": "03:00"
-    },
-    "trickplay_image_extraction": {
-      "enabled": true,
-      "schedule": "daily",
-      "time": "03:00"
-    },
-    "generate_intro_skip_data": {
-      "enabled": true,
-      "libraries": ["TV Shows"],
-      "schedule": "daily",
-      "time": "03:00"
-    }
-  }
-}
-```
-
-## Common Content Types
-
-- **movies**: Movie libraries
-- **tvshows**: TV Show libraries
-- **music**: Music libraries
-- **books**: Book libraries
-
-## Common Metadata Downloaders
-
-- **TheMovieDb**: Best for movies
-- **TheTVDB**: Best for TV shows
-- **The Open Movie Database**: Alternative/supplementary source
-
-## Common Image Fetchers
-
-- **TheMovieDb**: Primary source for movies
-- **TheTVDB**: Primary source for TV shows
-- **Fanart**: High-quality fan art
-- **Screen Grabber**: Extract images from video (disable to save resources)
-
-## Scheduled Task Types
-
-- **scan_media_library**: Regular library scans for new content
-- **extract_chapter_images**: Extract chapter images from videos
-- **trickplay_image_extraction**: Generate timeline preview thumbnails
-- **generate_intro_skip_data**: Detect TV show intros for skip functionality
-
-## Troubleshooting
-
-### Connection Failed
-
-```
-Failed to connect to Jellyfin server
-```
-
-**Solutions:**
-- Verify the server URL is correct
-- Ensure Jellyfin server is running
-- Check that the server is accessible from your machine
-- Verify firewall settings
-
-### Authentication Failed
-
-```
-API request failed: 401 Unauthorized
-```
-
-**Solutions:**
-- Verify your API key is correct
-- Regenerate API key in Jellyfin Dashboard
-- Update `api_key` in `jellyfin.config.json`
-
-### Task Not Found
-
-```
-Task 'X' not found in scheduled tasks
-```
-
-**Solutions:**
-- The task may not be available in your Jellyfin version
-- Some tasks only appear after enabling related features
-- Check task names in Jellyfin Dashboard → Scheduled Tasks
-
-### Library Options Failed
-
-```
-Failed to apply library options
-```
-
-**Solutions:**
-- Some options may not be available in older Jellyfin versions
-- Try updating Jellyfin to the latest version
-- Some settings may require manual configuration in the UI
 
 ## API Reference
 
 This script uses the Jellyfin REST API. For detailed API documentation, see:
 https://api.jellyfin.org/
 
-The implementation is based on the **Jellyfin OpenAPI stable specification** (`jellyfin-openapi-stable.json`) and follows the official API contract for:
+The implementation is based on the **Jellyfin OpenAPI stable specification** and follows the official API contract for:
 
 - **Authentication**: X-Emby-Token header with API key
 - **Library Management**: `/Library/VirtualFolders` endpoints
@@ -311,74 +110,53 @@ The implementation is based on the **Jellyfin OpenAPI stable specification** (`j
 - **Scheduled Tasks**: `/ScheduledTasks` endpoints for task management
 - **Task Triggers**: `/ScheduledTasks/{taskId}/Triggers` for scheduling
 
-### OpenAPI Compliance
+### Key API Endpoints
 
-The script follows the OpenAPI specification for:
-- Proper HTTP methods (GET, POST, DELETE)
-- Correct request/response formats
-- Required authentication headers
-- Query parameters and request bodies
-- Error handling and status codes
+- `GET /System/Info` - Connection testing
+- `GET /Library/VirtualFolders` - List libraries
+- `POST /Library/VirtualFolders` - Create library
+- `POST /Library/VirtualFolders/LibraryOptions` - Configure library settings
+- `GET /ScheduledTasks` - List scheduled tasks
+- `POST /ScheduledTasks/{taskId}/Triggers` - Configure task triggers
 
-For the complete OpenAPI specification, refer to the official Jellyfin API documentation.
+## Troubleshooting
 
-Key endpoints used:
-- `GET/POST /Library/VirtualFolders` - Library management
-- `POST /Library/VirtualFolders/LibraryOptions` - Library settings
-- `GET /ScheduledTasks` - Scheduled task information
-- `POST /ScheduledTasks/{taskId}/Triggers` - Task scheduling
-
-## Examples
-
-### Configure a Single Movie Library
-
-```json
-{
-  "server": {
-    "url": "http://192.168.1.100:8096",
-    "api_key": "abc123..."
-  },
-  "libraries": [
-    {
-      "name": "Movies",
-      "content_type": "movies",
-      "folders": ["/mnt/movies"],
-      "metadata_downloaders": [
-        {"name": "TheMovieDb", "enabled": true, "priority": 1}
-      ],
-      "advanced": {
-        "metadata": {
-          "preferred_language": "en",
-          "country": "US"
-        },
-        "trickplay": {
-          "enable_trickplay_extraction": true
-        }
-      }
-    }
-  ],
-  "scheduled_tasks": {
-    "scan_media_library": {
-      "enabled": true,
-      "interval_minutes": 60
-    }
-  }
-}
+### Connection Failed
+```
+Failed to connect to Jellyfin server
 ```
 
-### Test Connection
+**Solutions:**
+- Verify the server URL in your `.env` file
+- Ensure Jellyfin server is running
+- Check that the server is accessible from your machine
+- Verify firewall settings
 
-```bash
-python3 configure_jellyfin.py --dry-run --verbose
+### Authentication Failed
+```
+API request failed: 401 Unauthorized
 ```
 
-This will test the connection and show what would be configured without making changes.
+**Solutions:**
+- Verify your API key in the `.env` file
+- Regenerate API key in Jellyfin Dashboard
+- Ensure the API key hasn't been deleted or expired
+
+### Environment Variables Not Found
+```
+API key not found in environment variables
+```
+
+**Solutions:**
+- Ensure `.env` file exists in the same directory as the script
+- Verify `.env` file has the correct format (see `.env.example`)
+- Check that `JELLYFIN_API_KEY` is set in the `.env` file
 
 ## Security Notes
 
-- **API Key Security**: Keep your API key secure. Don't commit it to version control.
-- **Use `.gitignore`**: Add `jellyfin.config.json` to `.gitignore` if it contains sensitive data
-- **Environment Variables**: Consider using environment variables for sensitive data
+- **API Key Security**: Keep your API key secure. The `.env` file is gitignored by default.
+- **Don't commit secrets**: Never commit the `.env` file to version control
+- **Use HTTPS**: For production, use HTTPS URLs for your Jellyfin server
 
 ## Support
 
@@ -386,7 +164,3 @@ For issues related to:
 - **This script**: Check the troubleshooting section above
 - **Jellyfin API**: See https://api.jellyfin.org/
 - **Jellyfin server**: See https://jellyfin.org/docs/
-
-## License
-
-This script is provided as-is for use with Jellyfin Media Server.

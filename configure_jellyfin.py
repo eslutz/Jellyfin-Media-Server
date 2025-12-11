@@ -28,16 +28,23 @@ Usage:
 Requirements:
     - Python 3.6+
     - requests library (install with: pip3 install requests)
+    - python-dotenv library (install with: pip3 install python-dotenv)
+    - .env file with JELLYFIN_URL and JELLYFIN_API_KEY
 """
 
 import argparse
 import json
 import logging
+import os
 import sys
 from typing import Dict, List, Any, Optional
 import requests
 from pathlib import Path
+from dotenv import load_dotenv
 
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Constants
 TICKS_PER_SECOND = 10000000  # Windows/Jellyfin ticks are 100-nanosecond intervals
@@ -664,16 +671,18 @@ def main():
         # Load configuration
         config = load_config(args.config)
 
-        # Extract server configuration
-        server_config = config.get('server', {})
-        server_url = server_config.get('url', 'http://localhost:8096')
-        api_key = server_config.get('api_key', '')
+        # Get server configuration from environment variables
+        server_url = os.getenv('JELLYFIN_URL', 'http://localhost:8096')
+        api_key = os.getenv('JELLYFIN_API_KEY', '')
 
-        if not api_key or api_key == 'YOUR_API_KEY_HERE':
-            logger.error("API key not configured in jellyfin.config.json")
-            logger.error("Please set 'server.api_key' to your Jellyfin API key")
+        if not api_key:
+            logger.error("API key not found in environment variables")
+            logger.error("Please set JELLYFIN_API_KEY in your .env file")
+            logger.error("Copy .env.example to .env and fill in your API key")
             logger.error("Get an API key from: Jellyfin Dashboard → API Keys")
             sys.exit(1)
+
+        logger.info(f"Using Jellyfin server at: {server_url}")
 
         # Create configurator
         configurator = JellyfinConfigurator(
@@ -688,6 +697,7 @@ def main():
             logger.error(f"  - Server URL: {server_url}")
             logger.error("  - API key is valid")
             logger.error("  - Server is running and accessible")
+            logger.error("  - Check your .env file configuration")
             sys.exit(1)
 
         # Apply configuration

@@ -20,8 +20,8 @@ ENV/
 *.swo
 *~
 
-# Sensitive configuration (contains API keys)
-jellyfin.config.json
+# Environment variables (contains secrets)
+.env
 
 # Temporary files
 /tmp/

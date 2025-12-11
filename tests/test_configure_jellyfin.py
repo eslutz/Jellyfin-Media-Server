@@ -6,6 +6,7 @@ These tests validate basic functionality without requiring a live Jellyfin serve
 """
 
 import json
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -23,25 +24,19 @@ TICKS_PER_SECOND = configure_jellyfin.TICKS_PER_SECOND
 class TestConfigLoading(unittest.TestCase):
     """Test configuration file loading."""
 
-    def test_load_example_config(self):
-        """Test that example config can be loaded."""
-        config_path = Path(__file__).parent.parent / "jellyfin.config.example.json"
+    def test_load_config(self):
+        """Test that config can be loaded."""
+        config_path = Path(__file__).parent.parent / "jellyfin.config.json"
         config = configure_jellyfin.load_config(str(config_path))
         
         self.assertIsInstance(config, dict)
-        self.assertIn('server', config)
         self.assertIn('libraries', config)
-        self.assertIn('url', config['server'])
-        self.assertIn('api_key', config['server'])
+        self.assertIn('scheduled_tasks', config)
 
     def test_config_has_required_fields(self):
-        """Test that example config has all required fields."""
-        config_path = Path(__file__).parent.parent / "jellyfin.config.example.json"
+        """Test that config has all required fields."""
+        config_path = Path(__file__).parent.parent / "jellyfin.config.json"
         config = configure_jellyfin.load_config(str(config_path))
-        
-        # Server config
-        self.assertIn('url', config['server'])
-        self.assertIn('api_key', config['server'])
         
         # Libraries
         self.assertIsInstance(config['libraries'], list)
