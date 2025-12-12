@@ -98,7 +98,7 @@ class JellyfinConfigurator:
             Response data as dictionary, or None if request failed
         """
         url = f"{self.server_url}/{endpoint.lstrip('/')}"
-        
+
         if self.dry_run and method.upper() != 'GET':
             logger.info(f"[DRY RUN] Would {method} {url}")
             if data:
@@ -116,7 +116,7 @@ class JellyfinConfigurator:
                 verify=True
             )
             response.raise_for_status()
-            
+
             if response.content:
                 return response.json()
             return {}
@@ -178,16 +178,16 @@ class JellyfinConfigurator:
             True if successful, False otherwise
         """
         name = library_config.get('name')
-        
+
         # Validate required fields
         if not name:
             logger.error("Library configuration missing required 'name' field")
             return False
-        
+
         logger.info(f"Configuring library: {name}")
 
         existing_library = self.get_library_by_name(name)
-        
+
         if existing_library:
             logger.info(f"Library '{name}' already exists, updating configuration...")
             return self._update_library(existing_library, library_config)
@@ -239,25 +239,29 @@ class JellyfinConfigurator:
         result = self._make_request('POST', '/Library/VirtualFolders', params=params)
         if result is not None:
             logger.info(f"Library '{name}' created successfully")
-            
+
             # TODO: Add additional folders if there are more than one
             # This may require additional API calls to add paths
             if len(folders) > 1:
                 logger.warning(
-                    f"Multiple folders detected for library '{name}'. Only the first folder ('{folders[0]}') was added automatically."
+                    f"Multiple folders detected for library '{name}'. "
+                    f"Only the first folder ('{folders[0]}') was added automatically."
                 )
                 logger.warning(
-                    "To add the remaining folders, open the Jellyfin web UI, go to 'Dashboard' > 'Libraries', edit the library, and add the following folders manually:"
+                    "To add the remaining folders, open the Jellyfin web UI, "
+                    "go to 'Dashboard' > 'Libraries', edit the library, "
+                    "and add the following folders manually:"
                 )
                 for folder in folders[1:]:
                     logger.warning(f"    {folder}")
                 logger.warning(
-                    "Alternatively, advanced users can use the Jellyfin API to add additional folders to the library."
+                    "Alternatively, advanced users can use the Jellyfin API "
+                    "to add additional folders to the library."
                 )
-            
+
             # Apply additional configuration settings
             return self._apply_library_settings(name, library_config)
-        
+
         logger.error(f"Failed to create library '{name}'")
         return False
 
@@ -274,7 +278,7 @@ class JellyfinConfigurator:
         """
         name = library_config.get('name')
         logger.info(f"Updating library '{name}' settings...")
-        
+
         # Apply library settings
         return self._apply_library_settings(name, library_config)
 
@@ -295,7 +299,7 @@ class JellyfinConfigurator:
             True if successful, False otherwise
         """
         logger.info(f"Applying settings for library '{library_name}'...")
-        
+
         # Get the library to retrieve its ItemId
         library = self.get_library_by_name(library_name)
         if not library:
@@ -304,44 +308,56 @@ class JellyfinConfigurator:
 
         # Build LibraryOptions object
         library_options = self._build_library_options(library_config)
-        
+
         # Log the settings that will be applied
         if library_config.get('metadata_downloaders'):
-            logger.info(f"  Metadata downloaders: {[m['name'] for m in library_config['metadata_downloaders'] if m.get('enabled', True)]}")
-        
+            downloaders = [
+                m['name'] for m in library_config['metadata_downloaders']
+                if m.get('enabled', True)
+            ]
+            logger.info(f"  Metadata downloaders: {downloaders}")
+
         if library_config.get('image_fetchers'):
-            logger.info(f"  Image fetchers: {[f['name'] for f in library_config['image_fetchers'] if f.get('enabled', True)]}")
-        
+            fetchers = [
+                f['name'] for f in library_config['image_fetchers']
+                if f.get('enabled', True)
+            ]
+            logger.info(f"  Image fetchers: {fetchers}")
+
         if library_config.get('metadata_savers'):
-            logger.info(f"  Metadata savers: {[s['name'] for s in library_config['metadata_savers'] if s.get('enabled', True)]}")
-        
+            savers = [
+                s['name'] for s in library_config['metadata_savers']
+                if s.get('enabled', True)
+            ]
+            logger.info(f"  Metadata savers: {savers}")
+
         advanced = library_config.get('advanced', {})
         if advanced.get('metadata'):
             metadata = advanced['metadata']
             logger.info(f"  Language: {metadata.get('preferred_language')}")
             logger.info(f"  Country: {metadata.get('country')}")
-        
+
         if advanced.get('chapter_images', {}).get('enable_chapter_image_extraction'):
             logger.info("  Chapter image extraction: ENABLED")
-        
+
         if advanced.get('trickplay', {}).get('enable_trickplay_extraction'):
             logger.info("  Trickplay extraction: ENABLED")
-        
+
         # Apply library options via API
         # Note: The exact API endpoint and payload structure may vary by Jellyfin version
         # This implementation is based on Jellyfin API documentation at https://api.jellyfin.org/
-        
+
         params = {
             'id': library.get('ItemId')
         }
-        
+
         result = self._make_request(
             'POST',
             '/Library/VirtualFolders/LibraryOptions',
             data=library_options,
             params=params
         )
-        
+
         if result is not None:
             logger.info(f"Library options applied successfully for '{library_name}'")
             return True
@@ -361,15 +377,15 @@ class JellyfinConfigurator:
             LibraryOptions dictionary for API
         """
         options = {}
-        
+
         # Basic library settings
         library_settings = library_config.get('library', {})
         if 'enable_realtime_monitoring' in library_settings:
             options['EnableRealtimeMonitor'] = library_settings['enable_realtime_monitoring']
-        
+
         # Advanced settings
         advanced = library_config.get('advanced', {})
-        
+
         # Metadata settings
         if advanced.get('metadata'):
             metadata = advanced['metadata']
@@ -379,42 +395,52 @@ class JellyfinConfigurator:
                 options['MetadataCountryCode'] = metadata['country']
             if 'save_artwork_into_media_folders' in metadata:
                 options['SaveLocalMetadata'] = metadata['save_artwork_into_media_folders']
-        
+
         # Chapter images
         if advanced.get('chapter_images'):
             chapter_settings = advanced['chapter_images']
             if 'enable_chapter_image_extraction' in chapter_settings:
-                options['EnableChapterImageExtraction'] = chapter_settings['enable_chapter_image_extraction']
+                options['EnableChapterImageExtraction'] = (
+                    chapter_settings['enable_chapter_image_extraction']
+                )
             if 'extract_during_library_scan' in chapter_settings:
-                options['ExtractChapterImagesDuringLibraryScan'] = chapter_settings['extract_during_library_scan']
-        
+                options['ExtractChapterImagesDuringLibraryScan'] = (
+                    chapter_settings['extract_during_library_scan']
+                )
+
         # Trickplay (may not be in standard API, depends on Jellyfin version)
         if advanced.get('trickplay'):
             trickplay_settings = advanced['trickplay']
             if 'enable_trickplay_extraction' in trickplay_settings:
-                options['EnableTrickplayImageExtraction'] = trickplay_settings['enable_trickplay_extraction']
-        
+                options['EnableTrickplayImageExtraction'] = (
+                    trickplay_settings['enable_trickplay_extraction']
+                )
+
         # Image settings
         if advanced.get('images'):
             image_settings = advanced['images']
             if 'skip_images_if_nfo_exists' in image_settings:
-                logger.warning("The 'skip_images_if_nfo_exists' setting is not supported via the LibraryOptions API and will be ignored. Please configure this option manually in the Jellyfin web UI if needed.")
-        
+                logger.warning(
+                    "The 'skip_images_if_nfo_exists' setting is not supported "
+                    "via the LibraryOptions API and will be ignored. "
+                    "Please configure this option manually in the Jellyfin web UI if needed."
+                )
+
         # TypeOptions for metadata/image fetchers
         # This is a complex structure that needs to be built based on content type
         type_options = []
-        
+
         # Build type option for the content type
         content_type = library_config.get('content_type', 'movies')
         type_name = self._get_type_name_for_content(content_type)
-        
+
         type_option = {
             'Type': type_name,
             'MetadataFetchers': [],
             'ImageFetchers': [],
             'MetadataSavers': []
         }
-        
+
         # Add metadata downloaders
         if library_config.get('metadata_downloaders'):
             for downloader in sorted(
@@ -423,7 +449,7 @@ class JellyfinConfigurator:
             ):
                 if downloader.get('enabled', True):
                     type_option['MetadataFetchers'].append(downloader['name'])
-        
+
         # Add image fetchers
         if library_config.get('image_fetchers'):
             for fetcher in sorted(
@@ -432,16 +458,16 @@ class JellyfinConfigurator:
             ):
                 if fetcher.get('enabled', True):
                     type_option['ImageFetchers'].append(fetcher['name'])
-        
+
         # Add metadata savers
         if library_config.get('metadata_savers'):
             for saver in library_config['metadata_savers']:
                 if saver.get('enabled', True):
                     type_option['MetadataSavers'].append(saver['name'])
-        
+
         type_options.append(type_option)
         options['TypeOptions'] = type_options
-        
+
         return options
 
     def _get_type_name_for_content(self, content_type: str) -> str:
@@ -473,7 +499,7 @@ class JellyfinConfigurator:
             True if successful, False otherwise
         """
         logger.info("Configuring scheduled tasks...")
-        
+
         # Get current scheduled tasks
         current_tasks = self._make_request('GET', '/ScheduledTasks')
         if current_tasks is None:
@@ -533,9 +559,9 @@ class JellyfinConfigurator:
 
         task_id = task.get('Key') or task.get('Id')
         enabled = task_config.get('enabled', True)
-        
+
         logger.info(f"Configuring task '{task_name}' (ID: {task_id})")
-        
+
         if not enabled:
             logger.info(f"  Task disabled - removing triggers")
             # Remove all triggers to disable
@@ -545,10 +571,10 @@ class JellyfinConfigurator:
                 data=[]
             )
             return result is not None
-        
+
         # Build triggers based on configuration
         triggers = []
-        
+
         if 'interval_minutes' in task_config:
             interval = task_config['interval_minutes']
             logger.info(f"  Setting interval: {interval} minutes")
@@ -556,11 +582,11 @@ class JellyfinConfigurator:
                 'Type': 'IntervalTrigger',
                 'IntervalTicks': interval * 60 * TICKS_PER_SECOND
             })
-        
+
         elif 'schedule' in task_config and task_config['schedule'] == 'daily':
             time_str = task_config.get('time', '03:00')
             logger.info(f"  Setting daily schedule at {time_str}")
-            
+
             # Parse time (format: HH:MM)
             try:
                 hours, minutes = map(int, time_str.split(':'))
@@ -571,7 +597,7 @@ class JellyfinConfigurator:
             except ValueError:
                 logger.error(f"Invalid time format: {time_str}. Expected HH:MM")
                 return False
-        
+
         # Apply triggers
         if triggers:
             result = self._make_request(
@@ -579,7 +605,7 @@ class JellyfinConfigurator:
                 f'/ScheduledTasks/{task_id}/Triggers',
                 data=triggers
             )
-            
+
             if result is not None:
                 logger.info(f"Task '{task_name}' configured successfully")
                 return True
@@ -632,14 +658,14 @@ def load_config(config_path: str) -> Dict:
         json.JSONDecodeError: If config file is invalid JSON
     """
     logger.info(f"Loading configuration from {config_path}")
-    
+
     path = Path(config_path)
     if not path.exists():
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
-    
+
     with open(path, 'r') as f:
         config = json.load(f)
-    
+
     logger.info("Configuration loaded successfully")
     return config
 
