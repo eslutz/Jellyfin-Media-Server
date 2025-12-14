@@ -5,7 +5,8 @@ Jellyfin Configuration Script
 This script reads configuration from jellyfin.config.json and applies it to a
 Jellyfin media server instance via the Jellyfin API.
 
-Based on the configuration plan in jellyfin-config-plan.md, this script automates:
+Based on the configuration plan in ../docs/jellyfin-media-server/configuration-plan.md,
+this script automates:
 - Library creation and configuration
 - Metadata downloader settings
 - Image fetcher settings
