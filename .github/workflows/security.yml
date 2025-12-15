@@ -1,36 +1,16 @@
 # ==============================================================================
-# Continuous Integration Pipeline
-# Runs on Pull Requests and pushes to the main branch.
-#
-# Pipeline Stages:
-# 1. FAST FAIL - JSON and Python validation
-# 2. QUALITY CHECKS - Python linting
-# 3. COMPREHENSIVE TESTS - Unit tests
-# 4. SECURITY SCANS - CodeQL, Trivy, dependency audit (parallel)
+# Security Pipeline
+# Comprehensive security scanning run on a weekly schedule.
 # ==============================================================================
 
-name: CI
+name: Security
 
 # ------------------------------------------------------------------------------
 # Triggers
 # ------------------------------------------------------------------------------
 on:
-  pull_request:
-    branches:
-      - main
-    # Ignore documentation-only changes
-    paths-ignore:
-      - "docs/**"
-      - "README.md"
-      - ".github/**"
-  push:
-    branches:
-      - main
-    # Ignore documentation-only changes
-    paths-ignore:
-      - "docs/**"
-      - "README.md"
-      - ".github/**"
+  schedule:
+    - cron: "30 1 * * 0" # Weekly on Sunday at 01:30 UTC
 
 # ------------------------------------------------------------------------------
 # Concurrency
@@ -38,6 +18,13 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+# ------------------------------------------------------------------------------
+# Permissions
+# ------------------------------------------------------------------------------
+permissions:
+  contents: read
+  security-events: write
 
 # ------------------------------------------------------------------------------
 # Environment Variables
@@ -49,104 +36,9 @@ env:
 # Jobs
 # ------------------------------------------------------------------------------
 jobs:
-  # ------------------------------------------------------------------------------
-  # FAST FAIL - Catch basic errors immediately
-  # ------------------------------------------------------------------------------
-
-  # Validate: JSON configuration file
-  validate-json:
-    name: Validate JSON
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Validate JSON configuration
-        run: |
-          python -m json.tool jellyfin.config.json > /dev/null
-          echo "✓ jellyfin.config.json is valid JSON"
-
-  # Validate: Python syntax
-  validate-python:
-    name: Validate Python
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Check Python syntax
-        run: |
-          python -m py_compile configure_jellyfin.py
-          echo "✓ Python syntax valid"
-
-  # ------------------------------------------------------------------------------
-  # QUALITY CHECKS - Code style and static analysis
-  # ------------------------------------------------------------------------------
-
-  # Lint: Python code quality checks
-  lint-python:
-    name: Lint Python
-    runs-on: ubuntu-latest
-    needs: validate-python
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run flake8
-        run: flake8 configure_jellyfin.py tests/ --max-line-length=100 --extend-ignore=E203,W503
-        continue-on-error: true
-
-      - name: Run Pylint
-        run: pylint configure_jellyfin.py --fail-under=8.0
-        continue-on-error: true
-
-  # ------------------------------------------------------------------------------
-  # COMPREHENSIVE TESTS - Full validation
-  # ------------------------------------------------------------------------------
-
-  # Tests: Unit tests
-  tests:
-    name: Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run unit tests
-        run: python tests/test_configure_jellyfin.py
-
-  # ------------------------------------------------------------------------------
-  # SECURITY SCANS - Vulnerability analysis and dependency auditing
-  # ------------------------------------------------------------------------------
-
-  # Dependencies: Python package vulnerability audit
+  # ----------------------------------------------------------------------------
+  # Python Dependencies - pip-audit vulnerability scanning
+  # ----------------------------------------------------------------------------
   check-dependencies:
     name: Dependency Audit
     runs-on: ubuntu-latest
@@ -224,7 +116,9 @@ jobs:
           sarif_file: pip-audit-results.sarif
           category: pip-audit
 
-  # CodeQL: Static security analysis
+  # ----------------------------------------------------------------------------
+  # CodeQL - Static security analysis
+  # ----------------------------------------------------------------------------
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
@@ -254,8 +148,11 @@ jobs:
         with:
           category: "/language:${{matrix.language}}"
 
-  # Trivy: Vulnerability and misconfiguration scanning
-  trivy:
+  # ----------------------------------------------------------------------------
+  # Trivy - Filesystem vulnerability scanning
+  # Scans source code, dependencies, and configuration files
+  # ----------------------------------------------------------------------------
+  trivy-filesystem:
     name: Trivy Filesystem Scan
     runs-on: ubuntu-latest
     permissions:
