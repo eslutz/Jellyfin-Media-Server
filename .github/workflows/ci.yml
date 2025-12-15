@@ -1,0 +1,280 @@
+# ==============================================================================
+# Continuous Integration Pipeline
+# Runs on Pull Requests and pushes to the main branch.
+#
+# Pipeline Stages:
+# 1. FAST FAIL - JSON and Python validation
+# 2. QUALITY CHECKS - Python linting
+# 3. COMPREHENSIVE TESTS - Unit tests
+# 4. SECURITY SCANS - CodeQL, Trivy, dependency audit (parallel)
+# ==============================================================================
+
+name: CI
+
+# ------------------------------------------------------------------------------
+# Triggers
+# ------------------------------------------------------------------------------
+on:
+  pull_request:
+    branches:
+      - main
+    # Ignore documentation-only changes
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - ".github/**"
+  push:
+    branches:
+      - main
+    # Ignore documentation-only changes
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - ".github/**"
+
+# ------------------------------------------------------------------------------
+# Concurrency
+# ------------------------------------------------------------------------------
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ------------------------------------------------------------------------------
+# Environment Variables
+# ------------------------------------------------------------------------------
+env:
+  PYTHON_VERSION: "3.x"
+
+# ------------------------------------------------------------------------------
+# Jobs
+# ------------------------------------------------------------------------------
+jobs:
+  # ------------------------------------------------------------------------------
+  # FAST FAIL - Catch basic errors immediately
+  # ------------------------------------------------------------------------------
+
+  # Validate: JSON configuration file
+  validate-json:
+    name: Validate JSON
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Validate JSON configuration
+        run: |
+          python -m json.tool jellyfin.config.json > /dev/null
+          echo "✓ jellyfin.config.json is valid JSON"
+
+  # Validate: Python syntax
+  validate-python:
+    name: Validate Python
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Check Python syntax
+        run: |
+          python -m py_compile configure_jellyfin.py
+          echo "✓ Python syntax valid"
+
+  # ------------------------------------------------------------------------------
+  # QUALITY CHECKS - Code style and static analysis
+  # ------------------------------------------------------------------------------
+
+  # Lint: Python code quality checks
+  lint-python:
+    name: Lint Python
+    runs-on: ubuntu-latest
+    needs: validate-python
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run flake8
+        run: flake8 configure_jellyfin.py tests/ --max-line-length=100 --extend-ignore=E203,W503
+        continue-on-error: true
+
+      - name: Run Pylint
+        run: pylint configure_jellyfin.py --fail-under=8.0
+        continue-on-error: true
+
+  # ------------------------------------------------------------------------------
+  # COMPREHENSIVE TESTS - Full validation
+  # ------------------------------------------------------------------------------
+
+  # Tests: Unit tests
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: python tests/test_configure_jellyfin.py
+
+  # ------------------------------------------------------------------------------
+  # SECURITY SCANS - Vulnerability analysis and dependency auditing
+  # ------------------------------------------------------------------------------
+
+  # Dependencies: Python package vulnerability audit
+  check-dependencies:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+
+      - name: Audit dependencies
+        run: |
+          # Run pip-audit and capture exit code
+          # Exit codes: 0 = no vulnerabilities, 1 = vulnerabilities found, 2+ = error
+          pip-audit --requirement requirements.txt --format json --output pip-audit-results.json || EXIT_CODE=$?
+          if [ "${EXIT_CODE:-0}" -ge 2 ]; then
+            echo "Error: pip-audit failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
+
+      - name: Convert pip-audit to SARIF
+        run: |
+          python3 << 'EOF'
+          import json
+          import sys
+          from datetime import datetime
+
+          with open('pip-audit-results.json') as f:
+              audit_data = json.load(f)
+
+          sarif = {
+              "version": "2.1.0",
+              "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+              "runs": [{
+                  "tool": {
+                      "driver": {
+                          "name": "pip-audit",
+                          "version": "2.0.0",
+                          "informationUri": "https://github.com/pypa/pip-audit"
+                      }
+                  },
+                  "results": []
+              }]
+          }
+
+          for vuln in audit_data.get('vulnerabilities', []):
+              sarif['runs'][0]['results'].append({
+                  "ruleId": vuln['id'],
+                  "level": "warning",
+                  "message": {"text": vuln['description']},
+                  "locations": [{
+                      "physicalLocation": {
+                          "artifactLocation": {"uri": "requirements.txt"},
+                          "region": {"startLine": 1}
+                      }
+                  }]
+              })
+
+          with open('pip-audit-results.sarif', 'w') as f:
+              json.dump(sarif, f, indent=2)
+          EOF
+
+      - name: Upload pip-audit results to Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: pip-audit-results.sarif
+          category: pip-audit
+
+  # CodeQL: Static security analysis
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["python"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{matrix.language}}"
+
+  # Trivy: Vulnerability and misconfiguration scanning
+  trivy:
+    name: Trivy Filesystem Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          ignore-unfixed: true
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH"
+
+      - name: Upload Trivy results to Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-filesystem

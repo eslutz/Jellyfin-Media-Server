@@ -1,0 +1,158 @@
+{
+  "libraries": [
+    {
+      "name": "Movies",
+      "content_type": "movies",
+      "folders": [
+        "/Volumes/MediaLib/movies"
+      ],
+      "display": {
+        "display_missing_episodes": false,
+        "display_specials": false
+      },
+      "library": {
+        "enable_realtime_monitoring": true
+      },
+      "metadata_downloaders": [
+        {
+          "name": "TheMovieDb",
+          "enabled": true,
+          "priority": 1
+        },
+        {
+          "name": "The Open Movie Database",
+          "enabled": true,
+          "priority": 2
+        }
+      ],
+      "image_fetchers": [
+        {
+          "name": "TheMovieDb",
+          "enabled": true,
+          "priority": 1
+        },
+        {
+          "name": "Fanart",
+          "enabled": true,
+          "priority": 2
+        }
+      ],
+      "metadata_savers": [
+        {
+          "name": "Nfo",
+          "enabled": true
+        }
+      ],
+      "advanced": {
+        "metadata": {
+          "preferred_language": "en",
+          "country": "US",
+          "prefer_embedded_titles": false,
+          "automatically_refresh_metadata": true,
+          "save_artwork_into_media_folders": false,
+          "replace_existing_images": true
+        },
+        "images": {
+          "skip_images_if_nfo_exists": true
+        },
+        "chapter_images": {
+          "enable_chapter_image_extraction": true,
+          "extract_during_library_scan": true
+        },
+        "trickplay": {
+          "enable_trickplay_extraction": true
+        }
+      },
+      "subtitles": {}
+    },
+    {
+      "name": "TV Shows",
+      "content_type": "tvshows",
+      "folders": [
+        "/Volumes/MediaLib/tv"
+      ],
+      "display": {
+        "display_missing_episodes": false,
+        "display_specials": false
+      },
+      "library": {
+        "enable_realtime_monitoring": true
+      },
+      "metadata_downloaders": [
+        {
+          "name": "TheTVDB",
+          "enabled": true,
+          "priority": 1
+        },
+        {
+          "name": "The Open Movie Database",
+          "enabled": true,
+          "priority": 2
+        }
+      ],
+      "image_fetchers": [
+        {
+          "name": "TheTVDB",
+          "enabled": true,
+          "priority": 1
+        },
+        {
+          "name": "Fanart",
+          "enabled": true,
+          "priority": 2
+        }
+      ],
+      "metadata_savers": [
+        {
+          "name": "Nfo",
+          "enabled": true
+        }
+      ],
+      "advanced": {
+        "metadata": {
+          "preferred_language": "en",
+          "country": "US",
+          "prefer_embedded_titles": false,
+          "automatically_refresh_metadata": true,
+          "save_artwork_into_media_folders": false,
+          "replace_existing_images": true
+        },
+        "images": {
+          "skip_images_if_nfo_exists": true
+        },
+        "chapter_images": {
+          "enable_chapter_image_extraction": true,
+          "extract_during_library_scan": true
+        },
+        "trickplay": {
+          "enable_trickplay_extraction": true
+        }
+      },
+      "subtitles": {}
+    }
+  ],
+  "scheduled_tasks": {
+    "scan_media_library": {
+      "enabled": true,
+      "interval_minutes": 30
+    },
+    "extract_chapter_images": {
+      "enabled": true,
+      "schedule": "daily",
+      "time": "03:00"
+    },
+    "trickplay_image_extraction": {
+      "enabled": true,
+      "schedule": "daily",
+      "time": "03:00"
+    },
+    "generate_intro_skip_data": {
+      "enabled": true,
+      "libraries": [
+        "TV Shows"
+      ],
+      "schedule": "daily",
+      "time": "03:00"
+    }
+  }
+}
