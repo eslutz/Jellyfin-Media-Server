@@ -1,6 +1,8 @@
 # Jellyfin Media Server Configuration
 
-Automated configuration tools for Jellyfin Media Server using Python 3 and the Jellyfin REST API.
+[![CI](https://github.com/eslutz/Jellyfin-Media-Server/actions/workflows/ci.yml/badge.svg)](https://github.com/eslutz/Jellyfin-Media-Server/actions/workflows/ci.yml)
+
+Automated configuration tools for Jellyfin Media Server using Python and the Jellyfin REST API.
 
 ## Overview
 
