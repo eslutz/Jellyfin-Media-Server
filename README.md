@@ -1,6 +1,7 @@
 # Jellyfin Media Server Configuration
 
 [![CI](https://github.com/eslutz/Jellyfin-Media-Server/actions/workflows/ci.yml/badge.svg)](https://github.com/eslutz/Jellyfin-Media-Server/actions/workflows/ci.yml)
+[![CI](https://github.com/eslutz/Jellyfin-Media-Server/actions/workflows/security.yml/badge.svg)](https://github.com/eslutz/Jellyfin-Media-Server/actions/workflows/security.yml)
 
 Automated configuration tools for Jellyfin Media Server using Python and the Jellyfin REST API.
 
