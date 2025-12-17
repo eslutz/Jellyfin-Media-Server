@@ -1,27 +1,17 @@
 #!/usr/bin/env python3
 """
-Jellyfin Configuration Script
+Jellyfin Global Configuration Script
 
-This script reads configuration from jellyfin.config.json and applies it to a
-Jellyfin media server instance via the Jellyfin API.
-
-Based on the configuration plan in ../docs/jellyfin-media-server/configuration-plan.md,
-this script automates:
-- Library creation and configuration
-- Metadata downloader settings
-- Image fetcher settings
-- Metadata saver settings
-- Advanced settings (language, country, chapter images, trickplay)
-- Scheduled task configuration
+This script reads configuration from jellyfin.config.json and applies only
+global Jellyfin settings via the API. Scope is intentionally limited to
+server-wide options (e.g., Quick Connect disablement and TrickplayOptions).
 
 API Documentation: https://api.jellyfin.org/
 OpenAPI Specification: Based on jellyfin-openapi-stable.json
 
 The implementation follows the Jellyfin OpenAPI specification for:
 - Authentication via X-Emby-Token header
-- Library management endpoints (/Library/VirtualFolders)
-- LibraryOptions configuration
-- Scheduled task triggers (/ScheduledTasks/{taskId}/Triggers)
+- Global configuration endpoints (/System/Configuration)
 
 Usage:
     python3 configure_jellyfin.py [--config jellyfin.config.json] [--dry-run]
@@ -38,7 +28,7 @@ import json
 import logging
 import os
 import sys
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 import requests
 from pathlib import Path
 from dotenv import load_dotenv
@@ -46,10 +36,6 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
-
-# Constants
-TICKS_PER_SECOND = 10000000  # Windows/Jellyfin ticks are 100-nanosecond intervals
-
 
 # Configure logging
 logging.basicConfig(
@@ -60,17 +46,9 @@ logger = logging.getLogger(__name__)
 
 
 class JellyfinConfigurator:
-    """Handles configuration of a Jellyfin server via API."""
+    """Handles global configuration of a Jellyfin server via API."""
 
     def __init__(self, server_url: str, api_key: str, dry_run: bool = False):
-        """
-        Initialize the Jellyfin configurator.
-
-        Args:
-            server_url: Base URL of the Jellyfin server (e.g., http://localhost:8096)
-            api_key: API key for authentication
-            dry_run: If True, only log actions without making changes
-        """
         self.server_url = server_url.rstrip('/')
         self.api_key = api_key
         self.dry_run = dry_run
@@ -86,18 +64,6 @@ class JellyfinConfigurator:
         data: Optional[Dict] = None,
         params: Optional[Dict] = None
     ) -> Optional[Dict]:
-        """
-        Make an API request to Jellyfin.
-
-        Args:
-            method: HTTP method (GET, POST, PUT, DELETE)
-            endpoint: API endpoint path
-            data: Request body data (for POST/PUT)
-            params: Query parameters
-
-        Returns:
-            Response data as dictionary, or None if request failed
-        """
         url = f"{self.server_url}/{endpoint.lstrip('/')}"
 
         if self.dry_run and method.upper() != 'GET':
@@ -128,12 +94,7 @@ class JellyfinConfigurator:
             return None
 
     def test_connection(self) -> bool:
-        """
-        Test connection to Jellyfin server.
-
-        Returns:
-            True if connection successful, False otherwise
-        """
+        """Verify connectivity to the Jellyfin server."""
         logger.info(f"Testing connection to {self.server_url}...")
         result = self._make_request('GET', '/System/Info')
         if result:
@@ -142,504 +103,69 @@ class JellyfinConfigurator:
         logger.error("Failed to connect to Jellyfin server")
         return False
 
-    def get_libraries(self) -> List[Dict]:
-        """
-        Get existing libraries from Jellyfin.
+    def disable_quick_connect(self) -> bool:
+        """Disable Quick Connect via the system configuration endpoint."""
+        logger.info("Ensuring Quick Connect is disabled...")
 
-        Returns:
-            List of library dictionaries
-        """
-        result = self._make_request('GET', '/Library/VirtualFolders')
-        return result if result else []
-
-    def get_library_by_name(self, name: str) -> Optional[Dict]:
-        """
-        Get a library by its name.
-
-        Args:
-            name: Library name to search for
-
-        Returns:
-            Library dictionary if found, None otherwise
-        """
-        libraries = self.get_libraries()
-        for library in libraries:
-            if library.get('Name') == name:
-                return library
-        return None
-
-    def create_or_update_library(self, library_config: Dict) -> bool:
-        """
-        Create or update a library based on configuration.
-
-        Args:
-            library_config: Library configuration dictionary
-
-        Returns:
-            True if successful, False otherwise
-        """
-        name = library_config.get('name')
-
-        # Validate required fields
-        if not name:
-            logger.error("Library configuration missing required 'name' field")
+        config = self._make_request('GET', '/System/Configuration')
+        if config is None:
+            logger.error("Unable to load system configuration")
             return False
 
-        logger.info(f"Configuring library: {name}")
+        if not config.get('QuickConnectAvailable', False):
+            logger.info("Quick Connect already disabled")
+            return True
 
-        existing_library = self.get_library_by_name(name)
+        config['QuickConnectAvailable'] = False
 
-        if existing_library:
-            logger.info(f"Library '{name}' already exists, updating configuration...")
-            return self._update_library(existing_library, library_config)
-        else:
-            logger.info(f"Creating new library '{name}'...")
-            return self._create_library(library_config)
-
-    def _create_library(self, library_config: Dict) -> bool:
-        """
-        Create a new library.
-
-        Args:
-            library_config: Library configuration dictionary
-
-        Returns:
-            True if successful, False otherwise
-        """
-        name = library_config.get('name')
-        content_type = library_config.get('content_type', 'movies')
-        folders = library_config.get('folders', [])
-
-        # Map content type to Jellyfin collection type
-        collection_type_map = {
-            'movies': 'movies',
-            'tvshows': 'tvshows',
-            'music': 'music',
-            'books': 'books'
-        }
-        collection_type = collection_type_map.get(content_type, 'movies')
-
-        # Create library with basic settings
-        # Note: The API expects multiple 'paths' parameters for multiple folders
-        params = {
-            'name': name,
-            'collectionType': collection_type,
-            'refreshLibrary': False
-        }
-
-        # For multiple folders, we need to add them one at a time via separate API calls
-        # or use the proper array format for the API
-        if folders:
-            # Use the first folder for initial creation
-            # Note: 'paths' parameter takes a single path value per API call
-            params['paths'] = folders[0]
-        else:
-            logger.error(f"No folders specified for library '{name}'")
-            return False
-
-        result = self._make_request('POST', '/Library/VirtualFolders', params=params)
+        result = self._make_request('POST', '/System/Configuration', data=config)
         if result is not None:
-            logger.info(f"Library '{name}' created successfully")
+            logger.info("Quick Connect disabled")
+            return True
 
-            # TODO: Add additional folders if there are more than one
-            # This may require additional API calls to add paths
-            if len(folders) > 1:
-                logger.warning(
-                    f"Multiple folders detected for library '{name}'. "
-                    f"Only the first folder ('{folders[0]}') was added automatically."
-                )
-                logger.warning(
-                    "To add the remaining folders, open the Jellyfin web UI, "
-                    "go to 'Dashboard' > 'Libraries', edit the library, "
-                    "and add the following folders manually:"
-                )
-                for folder in folders[1:]:
-                    logger.warning(f"    {folder}")
-                logger.warning(
-                    "Alternatively, advanced users can use the Jellyfin API "
-                    "to add additional folders to the library."
-                )
-
-            # Apply additional configuration settings
-            return self._apply_library_settings(name, library_config)
-
-        logger.error(f"Failed to create library '{name}'")
+        logger.error("Failed to disable Quick Connect")
         return False
 
-    def _update_library(self, existing_library: Dict, library_config: Dict) -> bool:
-        """
-        Update an existing library.
+    def configure_global_trickplay(self, trickplay_options: Dict) -> bool:
+        """Merge provided TrickplayOptions into /System/Configuration."""
+        if not trickplay_options:
+            return True
 
-        Args:
-            existing_library: Existing library data from API
-            library_config: New library configuration
-
-        Returns:
-            True if successful, False otherwise
-        """
-        name = library_config.get('name')
-        logger.info(f"Updating library '{name}' settings...")
-
-        # Apply library settings
-        return self._apply_library_settings(name, library_config)
-
-    def _apply_library_settings(self, library_name: str, library_config: Dict) -> bool:
-        """
-        Apply detailed library settings using LibraryOptions API.
-
-        Uses the /Library/VirtualFolders/LibraryOptions endpoint to configure
-        detailed library settings including metadata fetchers, image fetchers, etc.
-
-        API Reference: https://api.jellyfin.org/#tag/Library/operation/UpdateLibraryOptions
-
-        Args:
-            library_name: Name of the library
-            library_config: Configuration to apply
-
-        Returns:
-            True if successful, False otherwise
-        """
-        logger.info(f"Applying settings for library '{library_name}'...")
-
-        # Get the library to retrieve its ItemId
-        library = self.get_library_by_name(library_name)
-        if not library:
-            logger.error(f"Cannot find library '{library_name}'")
+        cfg = self._make_request('GET', '/System/Configuration')
+        if cfg is None:
+            logger.error("Unable to load system configuration for TrickplayOptions")
             return False
 
-        # Build LibraryOptions object
-        library_options = self._build_library_options(library_config)
+        existing = cfg.get('TrickplayOptions') or {}
+        updated = dict(existing)
+        updated.update(trickplay_options)
 
-        # Log the settings that will be applied
-        if library_config.get('metadata_downloaders'):
-            downloaders = [
-                m['name'] for m in library_config['metadata_downloaders']
-                if m.get('enabled', True)
-            ]
-            logger.info(f"  Metadata downloaders: {downloaders}")
+        if updated == existing:
+            logger.info("Global TrickplayOptions already up to date")
+            return True
 
-        if library_config.get('image_fetchers'):
-            fetchers = [
-                f['name'] for f in library_config['image_fetchers']
-                if f.get('enabled', True)
-            ]
-            logger.info(f"  Image fetchers: {fetchers}")
-
-        if library_config.get('metadata_savers'):
-            savers = [
-                s['name'] for s in library_config['metadata_savers']
-                if s.get('enabled', True)
-            ]
-            logger.info(f"  Metadata savers: {savers}")
-
-        advanced = library_config.get('advanced', {})
-        if advanced.get('metadata'):
-            metadata = advanced['metadata']
-            logger.info(f"  Language: {metadata.get('preferred_language')}")
-            logger.info(f"  Country: {metadata.get('country')}")
-
-        if advanced.get('chapter_images', {}).get('enable_chapter_image_extraction'):
-            logger.info("  Chapter image extraction: ENABLED")
-
-        if advanced.get('trickplay', {}).get('enable_trickplay_extraction'):
-            logger.info("  Trickplay extraction: ENABLED")
-
-        # Apply library options via API
-        # Note: The exact API endpoint and payload structure may vary by Jellyfin version
-        # This implementation is based on Jellyfin API documentation at https://api.jellyfin.org/
-
-        params = {
-            'id': library.get('ItemId')
-        }
-
-        result = self._make_request(
-            'POST',
-            '/Library/VirtualFolders/LibraryOptions',
-            data=library_options,
-            params=params
-        )
-
+        cfg['TrickplayOptions'] = updated
+        result = self._make_request('POST', '/System/Configuration', data=cfg)
         if result is not None:
-            logger.info(f"Library options applied successfully for '{library_name}'")
+            logger.info("Global TrickplayOptions updated")
             return True
-        else:
-            logger.warning(f"Failed to apply library options for '{library_name}'")
-            logger.warning("This may require manual configuration in Jellyfin UI")
-            return False
 
-    def _build_library_options(self, library_config: Dict) -> Dict:
-        """
-        Build LibraryOptions object from configuration.
-
-        Args:
-            library_config: Library configuration dictionary
-
-        Returns:
-            LibraryOptions dictionary for API
-        """
-        options = {}
-
-        # Basic library settings
-        library_settings = library_config.get('library', {})
-        if 'enable_realtime_monitoring' in library_settings:
-            options['EnableRealtimeMonitor'] = library_settings['enable_realtime_monitoring']
-
-        # Advanced settings
-        advanced = library_config.get('advanced', {})
-
-        # Metadata settings
-        if advanced.get('metadata'):
-            metadata = advanced['metadata']
-            if 'preferred_language' in metadata:
-                options['PreferredMetadataLanguage'] = metadata['preferred_language']
-            if 'country' in metadata:
-                options['MetadataCountryCode'] = metadata['country']
-            if 'save_artwork_into_media_folders' in metadata:
-                options['SaveLocalMetadata'] = metadata['save_artwork_into_media_folders']
-
-        # Chapter images
-        if advanced.get('chapter_images'):
-            chapter_settings = advanced['chapter_images']
-            if 'enable_chapter_image_extraction' in chapter_settings:
-                options['EnableChapterImageExtraction'] = (
-                    chapter_settings['enable_chapter_image_extraction']
-                )
-            if 'extract_during_library_scan' in chapter_settings:
-                options['ExtractChapterImagesDuringLibraryScan'] = (
-                    chapter_settings['extract_during_library_scan']
-                )
-
-        # Trickplay (may not be in standard API, depends on Jellyfin version)
-        if advanced.get('trickplay'):
-            trickplay_settings = advanced['trickplay']
-            if 'enable_trickplay_extraction' in trickplay_settings:
-                options['EnableTrickplayImageExtraction'] = (
-                    trickplay_settings['enable_trickplay_extraction']
-                )
-
-        # Image settings
-        if advanced.get('images'):
-            image_settings = advanced['images']
-            if 'skip_images_if_nfo_exists' in image_settings:
-                logger.warning(
-                    "The 'skip_images_if_nfo_exists' setting is not supported "
-                    "via the LibraryOptions API and will be ignored. "
-                    "Please configure this option manually in the Jellyfin web UI if needed."
-                )
-
-        # TypeOptions for metadata/image fetchers
-        # This is a complex structure that needs to be built based on content type
-        type_options = []
-
-        # Build type option for the content type
-        content_type = library_config.get('content_type', 'movies')
-        type_name = self._get_type_name_for_content(content_type)
-
-        type_option = {
-            'Type': type_name,
-            'MetadataFetchers': [],
-            'ImageFetchers': [],
-            'MetadataSavers': []
-        }
-
-        # Add metadata downloaders
-        if library_config.get('metadata_downloaders'):
-            for downloader in sorted(
-                library_config['metadata_downloaders'],
-                key=lambda x: x.get('priority', 999)
-            ):
-                if downloader.get('enabled', True):
-                    type_option['MetadataFetchers'].append(downloader['name'])
-
-        # Add image fetchers
-        if library_config.get('image_fetchers'):
-            for fetcher in sorted(
-                library_config['image_fetchers'],
-                key=lambda x: x.get('priority', 999)
-            ):
-                if fetcher.get('enabled', True):
-                    type_option['ImageFetchers'].append(fetcher['name'])
-
-        # Add metadata savers
-        if library_config.get('metadata_savers'):
-            for saver in library_config['metadata_savers']:
-                if saver.get('enabled', True):
-                    type_option['MetadataSavers'].append(saver['name'])
-
-        type_options.append(type_option)
-        options['TypeOptions'] = type_options
-
-        return options
-
-    def _get_type_name_for_content(self, content_type: str) -> str:
-        """
-        Get Jellyfin type name for content type.
-
-        Args:
-            content_type: Content type from config (movies, tvshows, etc.)
-
-        Returns:
-            Jellyfin type name
-        """
-        type_map = {
-            'movies': 'Movie',
-            'tvshows': 'Series',
-            'music': 'Audio',
-            'books': 'Book'
-        }
-        return type_map.get(content_type, 'Movie')
-
-    def configure_scheduled_tasks(self, tasks_config: Dict) -> bool:
-        """
-        Configure scheduled tasks.
-
-        Args:
-            tasks_config: Scheduled tasks configuration
-
-        Returns:
-            True if successful, False otherwise
-        """
-        logger.info("Configuring scheduled tasks...")
-
-        # Get current scheduled tasks
-        current_tasks = self._make_request('GET', '/ScheduledTasks')
-        if current_tasks is None:
-            logger.error("Failed to retrieve scheduled tasks")
-            return False
-
-        # Map of task names to configuration
-        task_mapping = {
-            'scan_media_library': 'Scan Media Library',
-            'extract_chapter_images': 'Extract Chapter Images',
-            'trickplay_image_extraction': 'Trickplay Image Extraction',
-            'generate_intro_skip_data': 'Detect Intros'
-        }
-
-        for config_key, task_name in task_mapping.items():
-            if config_key in tasks_config:
-                task_config = tasks_config[config_key]
-                self._configure_scheduled_task(
-                    current_tasks,
-                    task_name,
-                    task_config
-                )
-
-        logger.info("Scheduled tasks configuration complete")
-        return True
-
-    def _configure_scheduled_task(
-        self,
-        current_tasks: List[Dict],
-        task_name: str,
-        task_config: Dict
-    ) -> bool:
-        """
-        Configure a specific scheduled task using Jellyfin API.
-
-        Uses the /ScheduledTasks/{taskId}/Triggers endpoint to configure task schedules.
-        API Reference: https://api.jellyfin.org/#tag/ScheduledTasks
-
-        Args:
-            current_tasks: List of current tasks from API
-            task_name: Name of the task to configure
-            task_config: Configuration for the task
-
-        Returns:
-            True if successful, False otherwise
-        """
-        # Find the task
-        task = None
-        for t in current_tasks:
-            if task_name.lower() in t.get('Name', '').lower():
-                task = t
-                break
-
-        if not task:
-            logger.warning(f"Task '{task_name}' not found in scheduled tasks")
-            return False
-
-        task_id = task.get('Key') or task.get('Id')
-        enabled = task_config.get('enabled', True)
-
-        logger.info(f"Configuring task '{task_name}' (ID: {task_id})")
-
-        if not enabled:
-            logger.info(f"  Task disabled - removing triggers")
-            # Remove all triggers to disable
-            result = self._make_request(
-                'POST',
-                f'/ScheduledTasks/{task_id}/Triggers',
-                data=[]
-            )
-            return result is not None
-
-        # Build triggers based on configuration
-        triggers = []
-
-        if 'interval_minutes' in task_config:
-            interval = task_config['interval_minutes']
-            logger.info(f"  Setting interval: {interval} minutes")
-            triggers.append({
-                'Type': 'IntervalTrigger',
-                'IntervalTicks': interval * 60 * TICKS_PER_SECOND
-            })
-
-        elif 'schedule' in task_config and task_config['schedule'] == 'daily':
-            time_str = task_config.get('time', '03:00')
-            logger.info(f"  Setting daily schedule at {time_str}")
-
-            # Parse time (format: HH:MM)
-            try:
-                hours, minutes = map(int, time_str.split(':'))
-                triggers.append({
-                    'Type': 'DailyTrigger',
-                    'TimeOfDayTicks': (hours * 3600 + minutes * 60) * TICKS_PER_SECOND
-                })
-            except ValueError:
-                logger.error(f"Invalid time format: {time_str}. Expected HH:MM")
-                return False
-
-        # Apply triggers
-        if triggers:
-            result = self._make_request(
-                'POST',
-                f'/ScheduledTasks/{task_id}/Triggers',
-                data=triggers
-            )
-
-            if result is not None:
-                logger.info(f"Task '{task_name}' configured successfully")
-                return True
-            else:
-                logger.error(f"Failed to configure task '{task_name}'")
-                return False
-        else:
-            logger.info(f"Task '{task_name}' - no triggers configured")
-            return True
+        logger.error("Failed to update Global TrickplayOptions")
+        return False
 
     def apply_configuration(self, config: Dict) -> bool:
-        """
-        Apply full configuration from config dictionary.
-
-        Args:
-            config: Complete configuration dictionary
-
-        Returns:
-            True if all configurations applied successfully
-        """
+        """Apply global configuration values from the provided config."""
         success = True
 
-        # Configure libraries
-        if 'libraries' in config:
-            logger.info(f"Configuring {len(config['libraries'])} libraries...")
-            for library_config in config['libraries']:
-                if not self.create_or_update_library(library_config):
-                    success = False
+        if not self.disable_quick_connect():
+            success = False
 
-        # Configure scheduled tasks
-        if 'scheduled_tasks' in config:
-            if not self.configure_scheduled_tasks(config['scheduled_tasks']):
-                success = False
+        try:
+            if 'trickplay_options' in config:
+                if not self.configure_global_trickplay(config['trickplay_options']):
+                    success = False
+        except Exception as e:
+            logger.warning(f"TrickplayOptions setup encountered an issue: {e}")
 
         return success
 

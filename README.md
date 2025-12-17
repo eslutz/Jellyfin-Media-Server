@@ -83,6 +83,8 @@ python3 configure_jellyfin.py
 - **[OpenAPI Reference](../docs/jellyfin-media-server/openapi-reference.md)** - OpenAPI specification notes
 - **[API Endpoints](../docs/jellyfin-media-server/api-endpoints.md)** - Endpoint documentation
 - **[API Notes](../docs/jellyfin-media-server/jellyfin-api-notes.md)** - Implementation notes
+- **[Manual Config Guide](docs/manual-config-guide.md)** - UI steps for non-global settings
+- **[Manual Configuration Checklist](docs/manual-configuration-checklist.md)** - End-to-end manual setup
 
 ## Project Structure
 
